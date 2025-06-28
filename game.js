@@ -1,87 +1,130 @@
-var gameStart = false;
-var gamePattern = [];
-var buttonColours = ["red", "blue", "green", "yellow"];
-var userClickedPattern = [];
-var level = 0;
-var gameOver = false;
-
-function setGameLevel(level) {
-  $("h1").text(`Level ${level}`);
-}
-
-function nextSequence() {
-  var randomNumber = Math.floor(Math.random(4) * 4);
-  var randomChosenColour = buttonColours[randomNumber];
-  gamePattern.push(randomChosenColour);
-  $(`#${randomChosenColour}`).fadeOut(100).fadeIn(100);
-
-  playSound(randomChosenColour);
-
-  level++;
-  setGameLevel(level);
-}
-
-function playSound(audioName) {
-  var audio = new Audio(`./sounds/${audioName}.mp3`);
-  audio.play();
-}
-
-function animatedPress(currentColour) {
-  $(`#${currentColour}`).addClass("pressed");
-  setTimeout(() => {
-    $(`#${currentColour}`).removeClass("pressed");
-  }, 100);
-}
-
-function startOver() {
-  level = 0;
-  gamePattern = [];
-  gameStart = false;
-  gameOver = true;
-}
-
-function checkAnswer(currentLevel) {
-  console.log(gamePattern);
-  console.log(userClickedPattern);
-  if (JSON.stringify(userClickedPattern) == JSON.stringify(gamePattern)) {
-    console.log("success");
-    setTimeout(() => {
-      nextSequence();
-    }, 1000);
-    userClickedPattern = [];
-  } else {
-    console.log("fail");
-    playSound("wrong");
-    $(document.body).addClass("game-over");
-    setTimeout(() => {
-      $(document.body).removeClass("game-over");
-    }, 200);
-    $("h1").text("Game Over, Press Any Key to Restart");
-    startOver();
+class SimonGame {
+  constructor() {
+    this.buttonColors = ["red", "blue", "green", "yellow"];
+    this.reset();
+    this.bindEvents();
   }
-}
 
-$(document).keydown(function (event) {
-  if (gameStart === false) {
-    if (gameOver === false) {
-      if (event.key === "a") {
-        gameStart = true;
-        nextSequence();
-      }
-    } else {
-      gameStart = true;
-      nextSequence();
+  reset() {
+    this.gameStarted = false;
+    this.gamePattern = [];
+    this.userPattern = [];
+    this.level = 0;
+    this.gameOver = false;
+  }
+
+  updateDisplay() {
+    const message = this.gameOver
+      ? "Game Over, Press Any Key to Restart"
+      : `Level ${this.level}`;
+    $("h1").text(message);
+  }
+
+  generateNextSequence() {
+    const randomIndex = Math.floor(Math.random() * this.buttonColors.length);
+    const randomColor = this.buttonColors[randomIndex];
+
+    this.gamePattern.push(randomColor);
+    this.level++;
+
+    this.animateButton(randomColor);
+    this.playSound(randomColor);
+    this.updateDisplay();
+  }
+
+  playSound(soundName) {
+    try {
+      const audio = new Audio(`./sounds/${soundName}.mp3`);
+      audio.play().catch((error) => {
+        console.warn(`Could not play sound: ${soundName}`, error);
+      });
+    } catch (error) {
+      console.warn(`Audio error: ${soundName}`, error);
     }
   }
-});
 
-$(".btn").on("click", function () {
-  var userChosenColour = $(this).attr("id");
-
-  userClickedPattern.push(userChosenColour);
-  playSound(userChosenColour);
-  animatedPress(userChosenColour);
-  if (userClickedPattern.length === gamePattern.length) {
-    checkAnswer(level);
+  animateButton(color) {
+    const $button = $(`#${color}`);
+    $button.fadeOut(100).fadeIn(100);
   }
-});
+
+  animatePress(color) {
+    const $button = $(`#${color}`);
+    $button.addClass("pressed");
+    setTimeout(() => $button.removeClass("pressed"), 100);
+  }
+
+  animateGameOver() {
+    $(document.body).addClass("game-over");
+    setTimeout(() => $(document.body).removeClass("game-over"), 200);
+  }
+
+  handleUserInput(color) {
+    this.userPattern.push(color);
+    this.playSound(color);
+    this.animatePress(color);
+
+    // Check if user has completed the current sequence
+    if (this.userPattern.length === this.gamePattern.length) {
+      this.checkUserSequence();
+    }
+  }
+
+  checkUserSequence() {
+    const isCorrect =
+      this.userPattern.length === this.gamePattern.length &&
+      this.userPattern.every(
+        (value, index) => value === this.gamePattern[index],
+      );
+
+    console.log("Game pattern:", this.gamePattern);
+    console.log("User pattern:", this.userPattern);
+    console.log(isCorrect ? "Success!" : "Failed!");
+
+    if (isCorrect) {
+      this.userPattern = [];
+      setTimeout(() => this.generateNextSequence(), 1000);
+    } else {
+      this.handleGameOver();
+    }
+  }
+
+  handleGameOver() {
+    this.playSound("wrong");
+    this.animateGameOver();
+    this.gameOver = true;
+    this.gameStarted = false;
+    this.updateDisplay();
+  }
+
+  startGame() {
+    if (this.gameOver) {
+      this.reset();
+    }
+
+    if (!this.gameStarted) {
+      this.gameStarted = true;
+      this.generateNextSequence();
+    }
+  }
+
+  bindEvents() {
+    // Keyboard event for starting/restarting game
+    $(document).on("keydown", (event) => {
+      if (event.key === "a" || this.gameOver) {
+        this.startGame();
+      }
+    });
+
+    // Button click events
+    $(".btn").on("click", (event) => {
+      if (this.gameStarted && !this.gameOver) {
+        const color = $(event.target).attr("id");
+        this.handleUserInput(color);
+      }
+    });
+  }
+}
+
+// Initialize the game
+const simonGame = new SimonGame();
